@@ -7,24 +7,38 @@ namespace ThreadPoolExercises.Core
     {
         public static void ExecuteOnThread(Action action, int repeats, CancellationToken token = default, Action<Exception>? errorAction = null)
         {
-            // * Create a thread and execute there `action` given number of `repeats` - waiting for the execution!
-            //   HINT: you may use `Join` to wait until created Thread finishes
-            // * In a loop, check whether `token` is not cancelled
-            // * If an `action` throws and exception (or token has been cancelled) - `errorAction` should be invoked (if provided)
-
-
-
+            var onError = errorAction ?? (_ => { });
+            var t = new Thread(() => DoWork(action, repeats, token, onError));
+            t.Start();
+            t.Join();
         }
 
         public static void ExecuteOnThreadPool(Action action, int repeats, CancellationToken token = default, Action<Exception>? errorAction = null)
         {
-            // * Queue work item to a thread pool that executes `action` given number of `repeats` - waiting for the execution!
-            //   HINT: you may use `AutoResetEvent` to wait until the queued work item finishes
-            // * In a loop, check whether `token` is not cancelled
-            // * If an `action` throws and exception (or token has been cancelled) - `errorAction` should be invoked (if provided)
+            var onError = errorAction ?? (_ => { });
+            var are = new AutoResetEvent(false);
+            ThreadPool.QueueUserWorkItem(_ => DoWork(action, repeats, token, onError, are));
+            are.WaitOne(1000);
+        }
 
-
-
+        public static void DoWork(Action action, int repeats, CancellationToken token, Action<Exception> onError, AutoResetEvent? are = null)
+        {
+            try
+            {
+                for (int i = 0; i < repeats; i++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    action();
+                }
+            }
+            catch (Exception ex)
+            {
+                onError(ex);
+            }
+            finally
+            {
+                are?.Set();
+            }
         }
     }
 }
